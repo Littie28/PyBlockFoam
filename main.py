@@ -70,6 +70,17 @@ def permutate_neasted_iterable(
         [itertools.permutations(item) for item in iterable]
     )
 
+block_vertex: collections.namedtuple = collections.namedtuple(
+    "block_local_vertex_id", "block local_vertex_id"
+)
+
+block_cells: collections.namedtuple = collections.namedtuple(
+    "block_cells", "x1 x2 x3"
+)
+
+vertex_local_id: collections.namedtuple = collections.namedtuple(
+    "vertex_local_id", "vertex local_id"
+)
 
 FLOAT_FORMAT_STRING: str = "{:12.6f}"
 INT_FORMAT_STRING: str = "{:6d}"
