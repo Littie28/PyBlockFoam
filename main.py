@@ -52,8 +52,23 @@ from pprint import pprint
 import collections
 import itertools
 import functools
+import typing
 
-block_vertex = collections.namedtuple("block_vertex", "block vertex_id")
+
+def permutate_neasted_iterable(
+    iterable: typing.Iterable[typing.Iterable],
+) -> itertools.chain:
+    """Takes a single neasted iterable and returns all permutations of its
+    items.
+
+    Example:
+
+    [(0, 1), (5, 6), (8, 3)] -> [(0, 1), (1, 0), (5, 6), (6, 5), (8, 3), (3, 8)]
+
+    """
+    return itertools.chain.from_iterable(
+        [itertools.permutations(item) for item in iterable]
+    )
 
 
 FLOAT_FORMAT_STRING: str = "{:12.6f}"
