@@ -70,6 +70,7 @@ def permutate_neasted_iterable(
         [itertools.permutations(item) for item in iterable]
     )
 
+
 block_vertex: collections.namedtuple = collections.namedtuple(
     "block_local_vertex_id", "block local_vertex_id"
 )
@@ -116,12 +117,13 @@ class Vertex:
         self.id = type(self).count
         type(self).count += 1
 
-        self.x = float(x)
-        self.y = float(y)
-        self.z = float(z)
+        self.x: float = float(x)
+        self.y: float = float(y)
+        self.z: float = float(z)
 
     @property
     def id(self) -> int:
+        """Unique id of the vertex instance"""
         return self._id
 
     @id.setter
@@ -131,7 +133,8 @@ class Vertex:
         self._id = int(value)
 
     @property
-    def global_id(self):
+    def global_id(self) -> int:
+        """Returns the index of the vertex in the global vertex dict"""
         return dict(
             [(vertex, i) for i, vertex in enumerate(Vertex.get_vertices())]
         ).get(self)
@@ -145,7 +148,7 @@ class Vertex:
 
                 x x                 x x             x
                 |/                  |/              |
-            x---x---x           x---x---x           x---x
+            x---o---x           x---o---x           o---x
                /|                                  /
               x x                                 x
 
@@ -236,15 +239,17 @@ class Block:
     )
 
     def __init__(self, *vertices, name=None):
-        assert [vertices.count(vert) for vert in vertices].count(1) == 8, (
-            "Need exactly 8 unique vertices to create a block,"
-            + f"got {len(vertices)}:"
-            + "\n\t"
-            + f"{vertices}"
-        )
+        if [vertices.count(vert) for vert in vertices].count(1) != 8:
+            raise ValueError(
+                "Need exactly 8 unique vertices to create a block, "
+                + f"got {len(vertices)}:"
+                + "\n\t"
+                + f"{vertices}"
+            )
         self.id = type(self).count
         type(self).count += 1
         self.name = name or f"Block-{self.id}"
+        self.cells = block_cells(10, 10, 10)
         for i, vert in enumerate(vertices):
             Vertex.vertex_dict[vert].append(block_vertex(self, i))
 
@@ -284,20 +289,18 @@ class Block:
         mapping = collections.defaultdict(list)
         [
             mapping[edge_tuple[0]].append(edge_tuple[1])
-            for vertex_pair in Block.edge_map
-            # use permutation to get both variants of edge
-            for edge_tuple in itertools.permutations(vertex_pair)
+            for edge_tuple in permutate_neasted_iterable(self.edge_map)
         ]
         return mapping
 
     @property
-    def vertex_with_id_in_block(self) -> tuple[Vertex, int]:
+    def vertices_with_local_id(self) -> list[vertex_local_id]:
         """Look up the vertex dict and find all vertices assigned to this
         (self) block. Return tuples containing the vertices of this block
         together with their respective position / ordering.
         """
         return [
-            (vertex, block_vertex.vertex_id)
+            vertex_local_id(vertex, block_vertex.local_vertex_id)
             for vertex, block_vertex_list in Vertex.vertex_dict.items()
             for block_vertex in block_vertex_list
             if block_vertex.block is self
@@ -311,13 +314,13 @@ class Block:
         return [
             vert
             for vert, _ in sorted(
-                self.vertex_with_id_in_block,
-                key=lambda x: x[1],
+                self.vertices_with_local_id,
+                key=lambda x: x.local_id,
             )
         ]
 
     @property
-    def vertices_by_id(self):
+    def vertices_by_global_id(self):
         return [vertex.id for vertex in self.vertices]
 
     @property
@@ -328,11 +331,11 @@ class Block:
     def blockMesh_format(self):
         return (
             "hex ("
-            + " ".join(map(str, self.vertices_by_id))
+            + " ".join(map(str, self.vertices_by_global_id))
             + ") "
             + self.name
             + " ("
-            + " ".join(map(str, [10, 10, 10]))
+            + " ".join(map(str, self.cells))
             + ") "
             + "simpleGrading (1 1 1)"
         )
