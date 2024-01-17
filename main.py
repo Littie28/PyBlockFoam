@@ -30,7 +30,7 @@ Example of a simple block
 
 The blockMeshDict is build up from different sections:
     1. Header
-    2. Geomerty
+    2. Geometry
     3. Vertices
     4. Blocks
     5. Edges
@@ -38,12 +38,15 @@ The blockMeshDict is build up from different sections:
     7. Patches
     8. mergePatchPairs
     9. Footer
-    
-The most important part are the vertices. Vertices should map to each block 
-they belong and vice versa. Courrently a defaultdict creating empty lists where 
-each block is appended is used. The vertices are returned if the block is in 
-the block list of the respective vertex. I currently don't know how good this 
-will scale but it is working right now. 
+
+The most important part are the vertices. Vertices should map to each block
+they belong and vice versa. Currently a defaultdict creating empty lists where
+each block is appended is used. The vertices are returned if the block is in
+the block list of the respective vertex. I currently don't know how good this
+will scale but it is working right now.
+
+Does it make sense to introduce a Mesh Class handling vertices, blocks and
+the rendering of the actual blockMeshDict file
 """
 from pprint import pprint
 import collections
@@ -53,20 +56,26 @@ import functools
 block_vertex = collections.namedtuple("block_vertex", "block vertex_id")
 
 
+FLOAT_FORMAT_STRING: str = "{:12.6f}"
+INT_FORMAT_STRING: str = "{:6d}"
+
+
 class Vertex:
     """The Vertex Class defines locations in 3d cartesian space. Vertices are
     used to form blocks, faces and edges.
     """
 
     count: int = 0
-    vertex_dict: collections.defaultdict = collections.defaultdict(list[block_vertex])
+    vertex_dict: collections.defaultdict = collections.defaultdict(
+        list[block_vertex]
+    )
 
     @staticmethod
-    def print_dict():
+    def print_dict() -> None:
         pprint(Vertex.vertex_dict)
 
     @staticmethod
-    def vertices():
+    def get_vertices() -> dict.keys:
         return Vertex.vertex_dict.keys()
 
     def __init__(self, x: float, y: float, z: float) -> None:
@@ -86,7 +95,7 @@ class Vertex:
         self.z = float(z)
 
     @property
-    def id(self):
+    def id(self) -> int:
         return self._id
 
     @id.setter
@@ -96,24 +105,59 @@ class Vertex:
         self._id = int(value)
 
     @property
+    def global_id(self):
+        return dict(
+            [(vertex, i) for i, vertex in enumerate(Vertex.get_vertices())]
+        ).get(self)
+
+    @property
+    def is_inner_vertex(self) -> bool:
+        """Returns true if a vertex is surrounded by other vertices (inner
+        vertex) and false otherwise
+
+            inner node:         outer nodes:
+
+                x x                 x x             x
+                |/                  |/              |
+            x---x---x           x---x---x           x---x
+               /|                                  /
+              x x                                 x
+
+        Returns:
+            bool: is_inner_node flag
+        """
+        return len(self.connected_to) == 6
+
+    @property
     def connected_to(self) -> set:
-        """Return a list of all vertices connected to this vertex"""
+        """Returns a set of all vertices connected to this vertex"""
         return set(
             [
                 block.vertices[vertex_id_in_block]
                 for block, vert_id in Vertex.vertex_dict.get(self, [])
-                for vertex_id_in_block in block.vertex_connection_map.get(vert_id)
+                for vertex_id_in_block in block.vertex_connection_map.get(
+                    vert_id
+                )
             ]
         )
 
-    def __repr__(self):
+    @property
+    def blockMesh_format(self):
+        pad, digits = 12, 6
+        x = FLOAT_FORMAT_STRING.format(self.x)
+        y = FLOAT_FORMAT_STRING.format(self.y)
+        z = FLOAT_FORMAT_STRING.format(self.z)
+        index = INT_FORMAT_STRING.format(self.global_id)
+        return f"( {x} {y} {z} ) // {index}"
+
+    def __repr__(self) -> str:
         return (
             self.__class__.__qualname__
             + f"-{self.id}(x={self.x!r},y={self.y!r},z={self.z!r})"
         )
 
-    def __str__(self):
-        return str(tuple(self.x, self.y, self.z)) + f" if-{self.id}"
+    def __str__(self) -> str:
+        return str(tuple(self.x, self.y, self.z)) + f" if-{self.global_id}"
 
     def __hash__(self):
         return hash((type(self), self.id))
@@ -139,7 +183,7 @@ class Block:
     """
 
     count: int = 0
-    face_map = dict(
+    face_map = dict(  # dict defining all faces
         bottom=(0, 1, 2, 3),
         left=(4, 0, 3, 7),
         front=(4, 5, 1, 0),
@@ -148,7 +192,7 @@ class Block:
         top=(4, 5, 6, 7),
     )
 
-    edge_map = tuple(
+    edge_map = tuple(  # tuples defining all edges of the cube
         (
             (0, 1),  # 0
             (3, 2),  # 1
@@ -165,16 +209,17 @@ class Block:
         )
     )
 
-    def __init__(self, *verts, name=None):
-        assert [verts.count(vert) for vert in verts].count(1) == 8, (
-            f"Need exactly 8 unique vertices to create a block, got {len(verts)}:"
+    def __init__(self, *vertices, name=None):
+        assert [vertices.count(vert) for vert in vertices].count(1) == 8, (
+            "Need exactly 8 unique vertices to create a block,"
+            + f"got {len(vertices)}:"
             + "\n\t"
-            + f"{verts}"
+            + f"{vertices}"
         )
         self.id = type(self).count
         type(self).count += 1
         self.name = name or f"Block-{self.id}"
-        for i, vert in enumerate(verts):
+        for i, vert in enumerate(vertices):
             Vertex.vertex_dict[vert].append(block_vertex(self, i))
 
     @classmethod
@@ -204,11 +249,18 @@ class Block:
     @property
     @functools.cache
     def vertex_connection_map(self):
+        """Creates a mapping (dictionary) for each vertex and the vertices it
+        is connected to.
+
+        Returns:
+            dict: connection map
+        """
         mapping = collections.defaultdict(list)
         [
-            mapping[permut[0]].append(permut[1])
+            mapping[edge_tuple[0]].append(edge_tuple[1])
             for vertex_pair in Block.edge_map
-            for permut in itertools.permutations(vertex_pair)
+            # use permutation to get both variants of edge
+            for edge_tuple in itertools.permutations(vertex_pair)
         ]
         return mapping
 
@@ -227,8 +279,8 @@ class Block:
 
     @property
     def vertices(self):
-        """Return all vertices of this block with correct ordering according to
-        their local location in the block
+        """Return all vertices of this block with correct ordering according
+        to their local location in the block
         """
         return [
             vert
@@ -239,8 +291,25 @@ class Block:
         ]
 
     @property
+    def vertices_by_id(self):
+        return [vertex.id for vertex in self.vertices]
+
+    @property
     def front_face(self):
         return [self.vertices[i] for i in self.face_map.get("front")]
+
+    @property
+    def blockMesh_format(self):
+        return (
+            "hex ("
+            + " ".join(map(str, self.vertices_by_id))
+            + ") "
+            + self.name
+            + " ("
+            + " ".join(map(str, [10, 10, 10]))
+            + ") "
+            + "simpleGrading (1 1 1)"
+        )
 
     def __repr__(self):
         return (
@@ -275,6 +344,6 @@ b1 = Block(v1, v8, v9, v2, v5, v10, v11, v6)
 
 b0.vertices
 
-v1.connected_to
+v1.global_id
 
 print()
