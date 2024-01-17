@@ -53,10 +53,21 @@ block_vertex = collections.namedtuple("block_vertex", "block vertex_id")
 
 
 class Vertex:
+    """The Vertex Class defines locations in 3d cartesian space. Vertices are
+    used to form blocks, faces and edges.
+    """
+
     count: int = 0
     vertex_dict: collections.defaultdict = collections.defaultdict(list[block_vertex])
 
-    @staticmethod
+        """Initializes a new Vertex instance. Instances get an 'hopefully'
+        unique id used for identification.
+
+        Args:
+            x (float): x coordinate in cartesian space
+            y (float): y coordinate in cartesian space
+            z (float): z coordinate in cartesian space
+        """
     def print_dict():
         pprint(Vertex.vertex_dict)
 
@@ -75,6 +86,24 @@ class Vertex:
     @id.setter
     def id(self, value):
         if getattr(self, "id", None):
+    """A collection of 8 vertices
+
+         7 o--------------------o 6
+          /|                   /|
+         / |                  / |
+        /  |                 /  |
+       /   |                /   |
+    4 o--------------------o 5  |
+      |    |               |    |
+      |  3 o---------------|----o 2
+      |   /                |   /
+      |  /                 |  /
+      | /                  | /
+      |/                   |/
+    0 o--------------------o 1
+
+    """
+
             raise ValueError("id already set")
         self._id = int(value)
 
@@ -94,7 +123,8 @@ class Block:
 
         assert len(verts) == 8
 
-        for i, vert in enumerate(verts):
+        their local location in the block
+        """
             Vertex.vertex_dict[vert].append(block_vertex(self, i))
 
     @property
@@ -103,7 +133,13 @@ class Block:
 
     @id.setter
     def id(self, value):
-        if getattr(self, "id", None):
+        return (
+            self.__class__.__qualname__
+            + f"-{self.id}("
+            + ",".join(map(repr, self.vertices))
+            + f",name={self.name}"
+            + ")"
+        )
             raise ValueError("id already set")
         self._id = int(value)
 
