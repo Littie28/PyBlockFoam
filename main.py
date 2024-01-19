@@ -63,7 +63,7 @@ def permutate_neasted_iterable(
 
     Example:
 
-    [(0, 1), (5, 6), (8, 3)] -> [(0, 1), (1, 0), (5, 6), (6, 5), (8, 3), (3, 8)]
+    [(0, 1),(5, 6),(8, 3)] -> [(0, 1),(1, 0),(5, 6),(6, 5),(8, 3),(3, 8)]
 
     """
     return itertools.chain.from_iterable(
@@ -104,6 +104,16 @@ class Vertex:
     @staticmethod
     def get_vertices() -> dict.keys:
         return Vertex.vertex_dict.keys()
+
+    @staticmethod
+    def get_blocks() -> set:
+        return set(
+            [
+                item.block
+                for block_list in Vertex.vertex_dict.values()
+                for item in block_list
+            ]
+        )
 
     def __init__(self, x: float, y: float, z: float) -> None:
         """Initializes a new Vertex instance. Instances get an 'hopefully'
@@ -172,7 +182,6 @@ class Vertex:
 
     @property
     def blockMesh_format(self):
-        pad, digits = 12, 6
         x = FLOAT_FORMAT_STRING.format(self.x)
         y = FLOAT_FORMAT_STRING.format(self.y)
         z = FLOAT_FORMAT_STRING.format(self.z)
@@ -186,7 +195,9 @@ class Vertex:
         )
 
     def __str__(self) -> str:
-        return str(tuple(self.x, self.y, self.z)) + f" if-{self.global_id}"
+        return (
+            str(tuple((self.x, self.y, self.z))) + f"  // id-{self.global_id}"
+        )
 
     def __hash__(self):
         return hash((type(self), self.id))
@@ -374,5 +385,27 @@ b1 = Block(v1, v8, v9, v2, v5, v10, v11, v6)
 b0.vertices
 
 v1.global_id
+
+
+def render_mesh(template_path="./_templates/"):
+    import jinja2
+
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path))
+    template = env.get_template("blockMeshDict.j2")
+
+    for vertex in Vertex.get_vertices():
+        print(vertex.blockMesh_format)
+
+    for block in Vertex.get_blocks():
+        print(block.blockMesh_format)
+
+    print(
+        template.render(
+            vertices=Vertex.get_vertices(), blocks=Vertex.get_blocks()
+        )
+    )
+
+
+render_mesh()
 
 print()
