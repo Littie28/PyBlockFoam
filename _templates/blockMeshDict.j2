@@ -1,14 +1,14 @@
 {% include "header.j2" %}
 
-vertieces
+vertices
 (
 {% for vertex in vertices %}    {{ vertex.blockMesh_format }}
-{% endfor %})
+{% endfor %});
 
 blocks
 (
 {% for block in blocks %}    {{ block.blockMesh_format }}
-{% endfor %})
+{% endfor %});
 
 
 {% include "footer.j2" %}

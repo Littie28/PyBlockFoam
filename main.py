@@ -83,6 +83,8 @@ vertex_local_id: collections.namedtuple = collections.namedtuple(
     "vertex_local_id", "vertex local_id"
 )
 
+arc_edge: collections.namedtuple = collections.namedtuple("arc", "v1 v2 point")
+
 FLOAT_FORMAT_STRING: str = "{:12.6f}"
 INT_FORMAT_STRING: str = "{:6d}"
 
@@ -334,6 +336,20 @@ class Block:
     def vertices_by_global_id(self):
         return [vertex.id for vertex in self.vertices]
 
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self.vertices[key]
+        elif isinstance(key, str):
+            if key in self.face_map.keys():
+                return [
+                    self.vertices[vertex_id]
+                    for vertex_id in self.face_map[key]
+                ]
+            else:
+                raise KeyError(
+                    f"got key: '{key}', valid keys are: {self.face_map.keys()}"
+                )
+
     @property
     def front_face(self):
         return [self.vertices[i] for i in self.face_map.get("front")]
@@ -380,7 +396,7 @@ v11 = Vertex(0, 2, 1)
 
 
 b0 = Block(v0, v1, v2, v3, v4, v5, v6, v7)
-b1 = Block(v1, v8, v9, v2, v5, v10, v11, v6)
+b1 = Block(v3, v2, v8, v9, v7, v6, v10, v11)
 
 b0.vertices
 
@@ -393,18 +409,14 @@ def render_mesh(template_path="./_templates/"):
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path))
     template = env.get_template("blockMeshDict.j2")
 
-    for vertex in Vertex.get_vertices():
-        print(vertex.blockMesh_format)
-
-    for block in Vertex.get_blocks():
-        print(block.blockMesh_format)
-
     print(
         template.render(
             vertices=Vertex.get_vertices(), blocks=Vertex.get_blocks()
         )
     )
 
+
+b0["top"]
 
 render_mesh()
 
